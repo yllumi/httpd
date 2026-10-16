@@ -1,15 +1,18 @@
 FROM alpine:latest
 
-# Applet `httpd` tidak ada di paket busybox bawaan Alpine maupun di
-# busybox-suid. Paket busybox-extras-lah yang menyediakannya, terpasang
-# sebagai /usr/sbin/httpd.
-RUN apk add --no-cache busybox-extras
+# - busybox-extras: applet `httpd` tidak ada di paket busybox bawaan Alpine
+#   maupun di busybox-suid; paket ini menyediakannya sebagai /usr/sbin/httpd.
+# - bash: Alpine default-nya hanya punya sh/ash dari busybox, jadi bash
+#   dipasang agar `docker compose exec web bash` bisa dipakai.
+RUN apk add --no-cache busybox-extras bash
 
 WORKDIR /www
 
-# Konten statis di-bake ke image: ini juga jadi sumber seed untuk named
-# volume yang di-mount ke /www (Docker menyalin isi image saat volume
-# pertama kali dibuat).
+# Image sengaja TIDAK berisi file web apa pun: konten disimpan di named
+# volume yang di-mount ke /www (lihat docker-compose.yml), sehingga image
+# bisa dipakai ulang untuk situs apa saja.
+# Kalau ingin konten ikut ke-bake ke image, buat folder site/ berisi
+# index.html lalu aktifkan baris COPY di bawah saat build.
 # COPY site/ /www/
 
 EXPOSE 80

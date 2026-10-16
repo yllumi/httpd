@@ -5,19 +5,18 @@ services:
     container_name: static-web-server
     restart: unless-stopped
     ports:
-      # Port 8080 di host sudah dipakai container lain (selarust-app-1),
-      # jadi di sini dipakai 8081. Ganti ke "8080:80" bila port itu bebas.
+      # Port 8080 di host sering sudah dipakai service lain, jadi default
+      # di sini 8081. Ganti bila perlu.
       - "8081:80"                 # Port host : Port container
     volumes:
       # Workdir /www di-mount ke named volume, bukan ke folder host.
-      # Isi volume di-seed otomatis dari konten image saat pertama kali dipakai
-      # (lihat Dockerfile: COPY site/ /www/).
-      # Catatan: volume yang sudah terisi TIDAK ikut ter-update saat image
-      # di-rebuild. Untuk menyamakan dengan image terbaru:
-      #   docker compose down -v && docker compose up -d --build
+      # Image sengaja kosong, jadi isi volume TIDAK di-seed dari image:
+      # masukkan konten sendiri (lihat README).
+      # PERINGATAN: `docker compose down -v` menghapus volume + isinya.
       - www_data:/www
-      # Alternatif bind mount, kalau ingin edit file dari host secara live:
-      # - ./site:/www:ro
+      # Alternatif bind mount, kalau ingin edit file dari host secara live
+      # (buat folder htdocs/ berisi index.html lebih dulu):
+      # - ./htdocs:/www:ro
 
 volumes:
   www_data:
