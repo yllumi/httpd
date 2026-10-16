@@ -16,8 +16,9 @@ Image Docker super ringan (± 8,5 MB) untuk menyajikan **halaman web HTML statis
 | Port di host (compose) | `8081` |
 | Shell | `sh` / `ash` (bawaan BusyBox) |
 | Ukuran image | ± 8,5 MB |
+| Konten bawaan | Halaman contoh `happy cooking!` dari `www/index.html` |
 
-> **Penting:** image ini sengaja **tidak berisi file web apa pun**. Document root `/www` di-mount ke named volume, jadi Anda yang mengisi kontennya. Selama `/www` masih kosong, server membalas **404** dan status container akan `unhealthy`. Lihat [Menambahkan konten](#menambahkan-konten).
+> **Penting:** image sudah berisi halaman contoh, jadi bisa langsung dipakai tanpa menyiapkan apa pun. Document root `/www` tetap di-mount ke named volume, dan Docker hanya mengisi volume itu dari image **saat volume masih kosong**. Kalau Anda punya volume lama dengan isi berbeda, jalankan `docker compose down -v` agar konten ter-seed ulang dari image.
 
 ## Menjalankan
 
@@ -30,6 +31,14 @@ docker compose up -d --build
 Halaman bisa dibuka di <http://localhost:8081>.
 
 ### Docker run
+
+Cara paling singkat, langsung memakai konten dari image:
+
+```bash
+docker run -d --name static-web-server -p 8081:80 yllumi/httpd:latest
+```
+
+Tambahkan named volume kalau ingin document root-nya writable dan isinya bertahan. Volume yang masih kosong akan di-seed dari konten image:
 
 ```bash
 docker run -d \
@@ -45,50 +54,45 @@ docker run -d \
 docker build -t yllumi/httpd:latest .
 ```
 
-## Menambahkan konten
+## Mengganti konten
 
-Konten **tidak** disimpan di image, melainkan di named volume yang ter-mount ke `/www`. Ada tiga cara mengisinya.
+Sumber konten ada di folder `www/` pada repo ini, dan folder itu di-bake ke image lewat `COPY www/ /www/` di Dockerfile. Ada tiga cara menggantinya.
 
-### 1. Tulis langsung dari dalam container
-
-```bash
-docker compose exec web sh
-```
+### 1. Ubah `www/index.html`, lalu build ulang
 
 ```bash
-cat > /www/index.html <<'HTML'
-<!DOCTYPE html>
-<html lang="id">
-<head>
-  <meta charset="utf-8">
-  <title>Halo</title>
-</head>
-<body>
-  <h1>Halo dari BusyBox httpd</h1>
-</body>
-</html>
-HTML
-exit
+docker compose build
+docker compose down -v && docker compose up -d
 ```
 
-### 2. Salin folder dari host dengan `docker compose cp`
+`down -v` diperlukan agar volume diisi ulang dari image, lihat [Mengapa perlu `down -v`](#mengapa-perlu-down--v).
 
-```bash
-docker compose cp ./htdocs/. web:/www/
-```
-
-### 3. Bind mount folder dari host (edit langsung, cocok untuk development)
+### 2. Bind mount folder dari host (paling nyaman untuk development)
 
 Aktifkan baris alternatif di `docker-compose.yml`:
 
 ```yaml
     volumes:
-      - ./htdocs:/www:ro
+      - ./www:/www:ro
 ```
 
-lalu buat `htdocs/index.html` dan jalankan `docker compose up -d`. Dengan cara ini perubahan file di host langsung terlihat di browser tanpa build ulang.
+lalu jalankan `docker compose up -d`. Folder `www/` di project langsung jadi document root, jadi setiap perubahan file terlihat di browser tanpa build ulang.
 
-Setelah ada `index.html`, status container berubah dari `unhealthy` menjadi `healthy` — healthcheck-nya memang memverifikasi bahwa halaman utama benar-benar bisa dilayani.
+### 3. Salin file langsung ke volume (tanpa build ulang)
+
+```bash
+docker compose cp ./www/index.html web:/www/
+```
+
+### Mengapa perlu `down -v`?
+
+Docker mengisi named volume dari image hanya ketika volume masih **kosong**. Kalau volume `www_data` sudah berisi file dari build sebelumnya, file di volume itulah yang disajikan dan perubahan di image tidak menimpanya. Menghapus volume memaksa Docker mengisi ulang dari image:
+
+```bash
+docker compose down -v && docker compose up -d --build
+```
+
+Perlu diingat: `down -v` ikut menghapus file yang Anda tambahkan sendiri ke volume, jadi backup dulu bila isinya penting (lihat [Backup dan restore volume](#backup-dan-restore-volume)).
 
 ## Masuk ke shell container
 
@@ -142,29 +146,26 @@ docker run --rm \
   alpine tar xzf /backup/www_data-backup.tar.gz -C /www
 ```
 
-## Ingin konten ikut ke-bake ke image?
+## Menambah file lain (CSS, gambar, dll)
 
-Di `Dockerfile` ada baris `COPY` yang sengaja di-comment. Siapkan folder `site/` berisi `index.html`:
+Taruh saja file tambahan di dalam `www/`, karena seluruh isi folder itu ikut ke image:
 
 ```
-site/
-└── index.html
+www/
+├── index.html
+├── style.css
+└── gambar.jpg
 ```
 
-lalu aktifkan baris berikut dan build ulang:
-
-```dockerfile
-COPY site/ /www/
-```
-
-Perlu diingat: Docker hanya mengisi volume dari image ketika volume masih **kosong**. Jika volume sudah terisi, konten dari image tidak akan menimpanya.
+Pada mode bind mount, file tersebut langsung tersedia. Pada mode named volume, build ulang lalu jalankan `docker compose down -v && docker compose up -d --build` agar volume ter-seed ulang.
 
 ## Troubleshooting
 
 **Halaman 404 / container `unhealthy`**
-Document root `/www` masih kosong. Tambahkan `index.html` seperti pada bagian [Menambahkan konten](#menambahkan-konten). Status container bisa dicek dengan:
+Document root `/www` kosong, biasanya karena volume dibuat saat image masih kosong. Paksa Docker mengisi ulang volume dari image:
 
 ```bash
+docker compose down -v && docker compose up -d --build
 docker compose ps
 docker compose exec web ls -la /www
 ```
@@ -176,17 +177,19 @@ Applet `httpd` tidak ada di paket `busybox` bawaan Alpine maupun di `busybox-sui
 Port di host sudah dipakai proses lain. Cek dengan `ss -ltnp | grep 8081` lalu ganti port host di `docker-compose.yml`, misalnya menjadi `"8090:80"`.
 
 **Perubahan `index.html` tidak muncul di browser**
-Pastikan Anda mengedit file yang benar:
+Dua penyebab yang paling sering:
 
-- Kalau memakai named volume, file ada di dalam volume (`/www` di dalam container), bukan di folder project.
-- Lakukan hard refresh di browser (Ctrl+Shift+R) untuk melewati cache.
+- Named volume sudah terisi konten lama, sehingga image baru tidak menimpanya. Jalankan `docker compose down -v && docker compose up -d --build`, atau pakai bind mount `./www:/www` selama development.
+- Cache browser. Lakukan hard refresh (Ctrl+Shift+R) untuk melewatinya.
 
 ## Struktur proyek
 
 ```
 .
-├── Dockerfile           # image: Alpine + busybox-extras (httpd)
+├── Dockerfile           # image: Alpine + busybox-extras (httpd) + COPY www/
 ├── docker-compose.yml   # service web, port 8081, named volume www_data
+├── www/
+│   └── index.html       # halaman statis, di-bake ke image
 └── README.md
 ```
 
@@ -195,3 +198,4 @@ Pastikan Anda mengedit file yang benar:
 - Server dijalankan di foreground (`httpd -f`) sebagai proses utama (PID 1) container, dengan `-h /www` sebagai document root.
 - BusyBox httpd sudah menangani MIME type umum seperti `text/html`, `text/css`, `text/javascript`, dan `image/*`.
 - Untuk file yang tidak ada, server membalas `404`.
+- Halaman contoh memuat gambar dari URL eksternal (`https://image.web.id/...`), jadi tampilannya bergantung pada host tersebut. Simpan gambarnya di dalam `www/` bila ingin sepenuhnya mandiri.

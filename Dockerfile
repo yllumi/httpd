@@ -7,12 +7,11 @@ RUN apk add --no-cache busybox-extras
 
 WORKDIR /www
 
-# Image sengaja TIDAK berisi file web apa pun: konten disimpan di named
-# volume yang di-mount ke /www (lihat docker-compose.yml), sehingga image
-# bisa dipakai ulang untuk situs apa saja.
-# Kalau ingin konten ikut ke-bake ke image, buat folder site/ berisi
-# index.html lalu aktifkan baris COPY di bawah saat build.
-# COPY site/ /www/
+# Halaman contoh di-bake ke image supaya `docker run yllumi/httpd` langsung
+# menampilkan halaman, tanpa perlu mengisi volume lebih dulu. Konten ini juga
+# menjadi isi awal named volume www_data saat volume dibuat pertama kali
+# (Docker mengisi volume yang masih kosong dengan isi image).
+COPY www/ /www/
 
 EXPOSE 80
 

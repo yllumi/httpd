@@ -10,9 +10,10 @@ services:
       - "8081:80"                 # Port host : Port container
     volumes:
       # Workdir /www di-mount ke named volume, bukan ke folder host.
-      # Image sengaja kosong, jadi isi volume TIDAK di-seed dari image:
-      # masukkan konten sendiri (lihat README).
-      # PERINGATAN: `docker compose down -v` menghapus volume + isinya.
+      # Saat volume masih kosong, isinya di-seed dari konten image
+      # (lihat Dockerfile: COPY www/ /www/).
+      # PERINGATAN: `docker compose down -v` menghapus volume + isinya,
+      # tetapi isinya akan ter-seed ulang dari image saat container dibuat.
       - www_data:/www
       # Alternatif bind mount, kalau ingin edit file dari host secara live
       # (buat folder htdocs/ berisi index.html lebih dulu):
