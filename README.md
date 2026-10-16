@@ -1,6 +1,6 @@
 # Static Web Server — Alpine + BusyBox httpd
 
-Image Docker super ringan (± 11 MB) untuk menyajikan **halaman web HTML statis**, dibangun dari `alpine:latest` dengan **BusyBox httpd** sebagai web server.
+Image Docker super ringan (± 8,5 MB) untuk menyajikan **halaman web HTML statis**, dibangun dari `alpine:latest` dengan **BusyBox httpd** sebagai web server.
 
 - Docker Hub: <https://hub.docker.com/r/yllumi/httpd>
 - GitHub: <https://github.com/yllumi/httpd>
@@ -14,8 +14,8 @@ Image Docker super ringan (± 11 MB) untuk menyajikan **halaman web HTML statis*
 | Document root | `/www` |
 | Port di container | `80` |
 | Port di host (compose) | `8081` |
-| Shell | `sh`, `ash`, dan `bash` |
-| Ukuran image | ± 11 MB |
+| Shell | `sh` / `ash` (bawaan BusyBox) |
+| Ukuran image | ± 8,5 MB |
 
 > **Penting:** image ini sengaja **tidak berisi file web apa pun**. Document root `/www` di-mount ke named volume, jadi Anda yang mengisi kontennya. Selama `/www` masih kosong, server membalas **404** dan status container akan `unhealthy`. Lihat [Menambahkan konten](#menambahkan-konten).
 
@@ -52,7 +52,7 @@ Konten **tidak** disimpan di image, melainkan di named volume yang ter-mount ke 
 ### 1. Tulis langsung dari dalam container
 
 ```bash
-docker compose exec web bash
+docker compose exec web sh
 ```
 
 ```bash
@@ -93,11 +93,18 @@ Setelah ada `index.html`, status container berubah dari `unhealthy` menjadi `hea
 ## Masuk ke shell container
 
 ```bash
-docker compose exec -it web bash    # bash
-docker compose exec -it web sh      # fallback: sh/ash bawaan busybox
+docker compose exec -it web sh
 ```
 
 Flag `-it` diperlukan agar sesi interaktif (prompt, riwayat perintah, dan line editing) berjalan normal. Tanpa `-it`, perintah tetap jalan tetapi tanpa prompt interaktif.
+
+Image ini hanya menyertakan shell bawaan BusyBox (`sh`/`ash`) supaya ukurannya tetap kecil, jadi `bash` tidak tersedia. Kalau tetap memerlukan `bash`, tambahkan paketnya di Dockerfile lalu build ulang:
+
+```dockerfile
+RUN apk add --no-cache busybox-extras bash
+```
+
+Setelah itu `docker compose exec -it web bash` bisa dipakai. Perlu rebuild image karena `bash` adalah paket, bukan file di volume.
 
 ## Port dan volume
 
@@ -178,7 +185,7 @@ Pastikan Anda mengedit file yang benar:
 
 ```
 .
-├── Dockerfile           # image: Alpine + busybox-extras + bash
+├── Dockerfile           # image: Alpine + busybox-extras (httpd)
 ├── docker-compose.yml   # service web, port 8081, named volume www_data
 └── README.md
 ```

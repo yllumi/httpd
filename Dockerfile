@@ -1,10 +1,9 @@
 FROM alpine:latest
 
-# - busybox-extras: applet `httpd` tidak ada di paket busybox bawaan Alpine
-#   maupun di busybox-suid; paket ini menyediakannya sebagai /usr/sbin/httpd.
-# - bash: Alpine default-nya hanya punya sh/ash dari busybox, jadi bash
-#   dipasang agar `docker compose exec web bash` bisa dipakai.
-RUN apk add --no-cache busybox-extras bash
+# Applet `httpd` tidak ada di paket busybox bawaan Alpine maupun di
+# busybox-suid. Paket busybox-extras-lah yang menyediakannya, terpasang
+# sebagai /usr/sbin/httpd.
+RUN apk add --no-cache busybox-extras
 
 WORKDIR /www
 
